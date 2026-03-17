@@ -1,0 +1,102 @@
+[
+    {
+        "model_name": "iPhone 16 Pro Max 256GB",
+        "price_vnd": 34990000,
+        "is_on_sale": false,
+        "discount_pct": null,
+        "source": "tgdd",
+        "scraped_at": "2026-03-17T08:00:00+07:00",
+        "scraped_date": "2026-03-17",
+        "raw_file": "data/raw/2026-03-17/tgdd.json"
+    },
+    {
+        "model_name": "iPhone 16 Pro 128GB",
+        "price_vnd": 28990000,
+        "is_on_sale": true,
+        "discount_pct": 4.5,
+        "source": "tgdd",
+        "scraped_at": "2026-03-17T08:00:00+07:00",
+        "scraped_date": "2026-03-17",
+        "raw_file": "data/raw/2026-03-17/tgdd.json"
+    },
+    {
+        "model_name": "iPhone 16 256GB",
+        "price_vnd": 27490000,
+        "is_on_sale": true,
+        "discount_pct": 5.5,
+        "source": "tgdd",
+        "scraped_at": "2026-03-17T08:00:00+07:00",
+        "scraped_date": "2026-03-17",
+        "raw_file": "data/raw/2026-03-17/tgdd.json"
+    },
+    {
+        "model_name": "iPhone 16 Pro Max 256GB",
+        "price_vnd": 35200000,
+        "is_on_sale": false,
+        "discount_pct": null,
+        "source": "fpt",
+        "scraped_at": "2026-03-17T08:05:00+07:00",
+        "scraped_date": "2026-03-17",
+        "raw_file": "data/raw/2026-03-17/fpt.json"
+    },
+    {
+        "model_name": "iPhone 16 Pro 128GB",
+        "price_vnd": 29490000,
+        "is_on_sale": false,
+        "discount_pct": null,
+        "source": "fpt",
+        "scraped_at": "2026-03-17T08:05:00+07:00",
+        "scraped_date": "2026-03-17",
+        "raw_file": "data/raw/2026-03-17/fpt.json"
+    },
+    {
+        "model_name": "iPhone 15 128GB",
+        "price_vnd": 19990000,
+        "is_on_sale": true,
+        "discount_pct": 10.0,
+        "source": "fpt",
+        "scraped_at": "2026-03-17T08:05:00+07:00",
+        "scraped_date": "2026-03-17",
+        "raw_file": "data/raw/2026-03-17/fpt.json"
+    },
+    {
+        "model_name": "iPhone 16 Pro Max 256GB",
+        "price_vnd": 34500000,
+        "is_on_sale": true,
+        "discount_pct": 1.4,
+        "source": "cellphones",
+        "scraped_at": "2026-03-17T08:10:00+07:00",
+        "scraped_date": "2026-03-17",
+        "raw_file": "data/raw/2026-03-17/cellphones.json"
+    },
+    {
+        "model_name": "iPhone 16 256GB",
+        "price_vnd": 27990000,
+        "is_on_sale": false,
+        "discount_pct": null,
+        "source": "cellphones",
+        "scraped_at": "2026-03-17T08:10:00+07:00",
+        "scraped_date": "2026-03-17",
+        "raw_file": "data/raw/2026-03-17/cellphones.json"
+    },
+    {
+        "model_name": "iPhone 15 Pro 256GB",
+        "price_vnd": 25990000,
+        "is_on_sale": true,
+        "discount_pct": 7.2,
+        "source": "cellphones",
+        "scraped_at": "2026-03-17T08:10:00+07:00",
+        "scraped_date": "2026-03-17",
+        "raw_file": "data/raw/2026-03-17/cellphones.json"
+    },
+    {
+        "model_name": "iPhone 15 128GB",
+        "price_vnd": 20500000,
+        "is_on_sale": false,
+        "discount_pct": null,
+        "source": "cellphones",
+        "scraped_at": "2026-03-17T08:10:00+07:00",
+        "scraped_date": "2026-03-17",
+        "raw_file": "data/raw/2026-03-17/cellphones.json"
+    }
+]

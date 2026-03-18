@@ -44,7 +44,7 @@ def insert_data(data: list, table: str):
     Insert a list of records into the specified Supabase table.
     """
     try:
-        response = supabase.table(table).insert(data).execute()
+        response = supabase.table(table).upsert(data, on_conflict='model_name,source,scraped_date').execute()
         print(f"✅ Successfully inserted {len(data)} records into '{table}'.")
         return response
     except Exception as e:

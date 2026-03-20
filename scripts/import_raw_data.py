@@ -3,8 +3,11 @@
 Scan data/raw/<date>/*.json and upsert every record into Supabase.
 
 Usage:
-    # import everything not yet imported
+    # import everything
     python scripts/import_raw_data.py
+
+    # import + move successful files to data/archive/
+    python scripts/import_raw_data.py --archive
 
     # import a specific date only
     python scripts/import_raw_data.py --date 2026-03-20
@@ -12,13 +15,16 @@ Usage:
     # import a specific file
     python scripts/import_raw_data.py --file data/raw/2026-03-20/cellphones_20260320_093221.json
 
-    # dry-run (print what would be imported, no DB writes)
+    # dry-run (show what would happen, no DB writes, no archiving)
     python scripts/import_raw_data.py --dry-run
+
+    # combine: preview archive behaviour without touching anything
+    python scripts/import_raw_data.py --archive --dry-run
 """
 
 import os
 import json
-import sys
+import shutil
 import argparse
 import logging
 from pathlib import Path
@@ -44,25 +50,32 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("Missing SUPABASE_URL or SUPABASE_KEY in .env file")
+    raise ValueError("❌ Missing SUPABASE_URL or SUPABASE_KEY in .env file")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-TABLE_NAME       = "staging_raw_prices"
-RAW_DATA_ROOT    = Path("data", "raw")
-BATCH_SIZE       = 500          # upsert in chunks to avoid payload limits
-UPSERT_CONFLICT  = "model_name,source,scraped_date"
+TABLE_NAME      = "staging_raw_prices"
+RAW_DATA_ROOT   = Path("data", "raw")
+ARCHIVE_ROOT    = Path("data", "archive")
+BATCH_SIZE      = 500
+UPSERT_CONFLICT = "model_name,source,scraped_date"
 
 # ---------------------------------------------------------------------------
 # File discovery
 # ---------------------------------------------------------------------------
 
+def _is_date_folder(name: str) -> bool:
+    try:
+        datetime.strptime(name, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+
 def discover_files(date_filter: str | None = None) -> list[Path]:
     """
-    Walk data/raw/<date>/*.json and return all matching files, sorted oldest→newest.
-
-    Args:
-        date_filter: "YYYY-MM-DD" string to limit to a single day, or None for all.
+    Walk data/raw/<YYYY-MM-DD>/*.json, sorted oldest -> newest.
+    Ignores non-date subfolders (e.g. 'mock').
     """
     if not RAW_DATA_ROOT.exists():
         logger.error("Raw data root not found: %s", RAW_DATA_ROOT.resolve())
@@ -71,7 +84,6 @@ def discover_files(date_filter: str | None = None) -> list[Path]:
     if date_filter:
         date_dirs = [RAW_DATA_ROOT / date_filter]
     else:
-        # Every sub-directory that looks like a date (YYYY-MM-DD)
         date_dirs = sorted(
             d for d in RAW_DATA_ROOT.iterdir()
             if d.is_dir() and _is_date_folder(d.name)
@@ -83,18 +95,10 @@ def discover_files(date_filter: str | None = None) -> list[Path]:
             logger.warning("Date folder not found: %s", d)
             continue
         day_files = sorted(d.glob("*.json"))
-        logger.info("📂 %s → %d file(s)", d.name, len(day_files))
+        logger.info("📂 %s -> %d file(s)", d.name, len(day_files))
         files.extend(day_files)
 
     return files
-
-
-def _is_date_folder(name: str) -> bool:
-    try:
-        datetime.strptime(name, "%Y-%m-%d")
-        return True
-    except ValueError:
-        return False
 
 # ---------------------------------------------------------------------------
 # JSON loading
@@ -106,16 +110,23 @@ def load_json_file(file_path: Path) -> list[dict] | None:
             data = json.load(f)
 
         if not isinstance(data, list):
-            logger.warning("⚠️  %s: expected a JSON array, got %s — skipping", file_path.name, type(data).__name__)
+            logger.warning(
+                "⚠️  %s: expected JSON array, got %s — skipping",
+                file_path.name, type(data).__name__,
+            )
             return None
 
-        logger.info("Loaded %d records from %s", len(data), file_path.name)
+        if len(data) == 0:
+            logger.warning("⚠️  %s: empty array — skipping", file_path.name)
+            return None
+
+        logger.info("✅ Loaded %d records from %s", len(data), file_path.name)
         return data
 
     except FileNotFoundError:
-        logger.error("File not found: %s", file_path)
-    except json.JSONDecodeError as e:
-        logger.error("Invalid JSON in %s: %s", file_path.name, e)
+        logger.error("❌ File not found: %s", file_path)
+    except json.JSONDecodeError as exc:
+        logger.error("❌ Invalid JSON in %s: %s", file_path.name, exc)
 
     return None
 
@@ -123,10 +134,10 @@ def load_json_file(file_path: Path) -> list[dict] | None:
 # Supabase upsert
 # ---------------------------------------------------------------------------
 
-def insert_data(data: list[dict], table: str, dry_run: bool = False) -> bool:
+def insert_data(data: list[dict], dry_run: bool = False) -> bool:
     """
     Upsert records in BATCH_SIZE chunks.
-    Returns True if all batches succeeded.
+    Returns True only if every batch succeeded.
     """
     total   = len(data)
     success = 0
@@ -136,23 +147,62 @@ def insert_data(data: list[dict], table: str, dry_run: bool = False) -> bool:
         end   = start + len(batch)
 
         if dry_run:
-            logger.info("🔍 [DRY-RUN] Would upsert records %d–%d into '%s'", start + 1, end, table)
+            logger.info(
+                "🔍 [DRY-RUN] Would upsert records %d-%d into '%s'",
+                start + 1, end, TABLE_NAME,
+            )
             success += len(batch)
             continue
 
         try:
-            supabase.table(table).upsert(batch, on_conflict=UPSERT_CONFLICT).execute()
-            logger.info("Upserted records %d–%d / %d into '%s'", start + 1, end, total, table)
+            supabase.table(TABLE_NAME).upsert(batch, on_conflict=UPSERT_CONFLICT).execute()
+            logger.info("⬆️  Upserted records %d-%d / %d", start + 1, end, total)
             success += len(batch)
         except Exception as exc:
-            logger.error("Batch %d–%d failed: %s", start + 1, end, exc)
+            logger.error("❌ Batch %d-%d failed: %s", start + 1, end, exc)
 
-    if success == total:
-        logger.info("%d / %d records upserted successfully", success, total)
-        return True
+    all_ok = success == total
+    if all_ok:
+        logger.info("🎉 %d / %d records upserted", success, total)
+    else:
+        logger.warning("⚠️  Only %d / %d records succeeded", success, total)
 
-    logger.warning("%d / %d records succeeded", success, total)
-    return success > 0
+    return all_ok
+
+# ---------------------------------------------------------------------------
+# Archiving
+# ---------------------------------------------------------------------------
+
+def archive_file(file_path: Path, dry_run: bool = False) -> None:
+    """
+    Move  data/raw/<date>/file.json
+      ->  data/archive/<date>/file.json
+
+    Cleans up the source date-folder if it becomes empty.
+    Only called on files that were imported successfully.
+    """
+    try:
+        relative = file_path.relative_to(RAW_DATA_ROOT)
+    except ValueError:
+        relative = Path(file_path.parent.name) / file_path.name
+
+    dest = ARCHIVE_ROOT / relative
+
+    if dry_run:
+        logger.info("🔍 [DRY-RUN] Would archive -> %s", dest)
+        return
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(file_path), str(dest))
+    logger.info("📦 Archived -> %s", dest)
+
+    # Remove empty date folder from raw/
+    try:
+        if not any(file_path.parent.iterdir()):
+            file_path.parent.rmdir()
+            logger.info("🗑️  Removed empty folder: %s", file_path.parent)
+    except Exception:
+        pass
 
 # ---------------------------------------------------------------------------
 # Orchestrator
@@ -161,13 +211,9 @@ def insert_data(data: list[dict], table: str, dry_run: bool = False) -> bool:
 def run_import(
     date_filter: str | None = None,
     single_file: str | None = None,
+    archive: bool = False,
     dry_run: bool = False,
 ) -> None:
-    """
-    Main import logic.
-
-    Priority: single_file > date_filter > all files.
-    """
     if single_file:
         files = [Path(single_file)]
     else:
@@ -177,12 +223,18 @@ def run_import(
         logger.warning("No JSON files found to import.")
         return
 
+    mode_tags = []
+    if dry_run: mode_tags.append("DRY-RUN")
+    if archive: mode_tags.append("ARCHIVE")
+    mode_str = f" [{', '.join(mode_tags)}]" if mode_tags else ""
+
     logger.info("=" * 60)
-    logger.info("Starting import — %d file(s) | table: %s%s", len(files), TABLE_NAME, " [DRY-RUN]" if dry_run else "")
+    logger.info("Import start — %d file(s) | table: %s%s", len(files), TABLE_NAME, mode_str)
     logger.info("=" * 60)
 
-    total_records  = 0
-    failed_files   = []
+    total_records = 0
+    archived_files: list[Path] = []
+    failed_files:   list[Path] = []
 
     for file_path in files:
         data = load_json_file(file_path)
@@ -190,17 +242,30 @@ def run_import(
             failed_files.append(file_path)
             continue
 
-        ok = insert_data(data, TABLE_NAME, dry_run=dry_run)
+        ok = insert_data(data, dry_run=dry_run)
+
         if ok:
             total_records += len(data)
+            if archive:
+                archive_file(file_path, dry_run=dry_run)
+                archived_files.append(file_path)
         else:
+            # Never archive files that failed — keep them in raw/ for retry
             failed_files.append(file_path)
 
     # Summary
     logger.info("=" * 60)
-    logger.info("Import complete — %d records across %d file(s)", total_records, len(files) - len(failed_files))
+    logger.info(
+        "Done — %d record(s) from %d/%d file(s)",
+        total_records, len(files) - len(failed_files), len(files),
+    )
+    if archive:
+        logger.info(
+            "📦 %d file(s) archived to %s/",
+            len(archived_files), ARCHIVE_ROOT,
+        )
     if failed_files:
-        logger.warning("⚠️  %d file(s) had errors:", len(failed_files))
+        logger.warning("⚠️  %d file(s) failed (kept in data/raw/ for retry):", len(failed_files))
         for f in failed_files:
             logger.warning("   • %s", f)
     logger.info("=" * 60)
@@ -211,23 +276,29 @@ def run_import(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Import raw scraped JSON files into Supabase."
+        description="Import raw scraped JSON files into Supabase.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument(
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument(
         "--date",
         metavar="YYYY-MM-DD",
         help="Import only files from a specific date folder.",
     )
-    group.add_argument(
+    source.add_argument(
         "--file",
         metavar="PATH",
         help="Import a single JSON file.",
     )
     parser.add_argument(
+        "--archive",
+        action="store_true",
+        help="Move successfully imported files to data/archive/<date>/.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Print what would be imported without writing to DB.",
+        help="Preview all actions without writing to DB or moving files.",
     )
     return parser.parse_args()
 
@@ -237,5 +308,6 @@ if __name__ == "__main__":
     run_import(
         date_filter=args.date,
         single_file=args.file,
+        archive=args.archive,
         dry_run=args.dry_run,
     )

@@ -1,6 +1,6 @@
 # Bước 1 — Scrape
-python scripts/scraper_tgdd.py
-python scripts/scraper_cellphones.py
+python scrapers/tgdd.py
+python scrapers/cellphones.py
 
 # Bước 2 — Import JSON vào staging
 python scripts/import_raw_data.py --archive

@@ -1,0 +1,45 @@
+name: Daily iPhone Price Pipeline
+
+on:
+  schedule:
+    # 02:00 UTC = 09:00 AM Vietnam time (UTC+7)
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # cho phép chạy tay từ GitHub UI
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: 🌐 Install Playwright browsers
+        run: playwright install chromium --with-deps
+
+      - name: 🚀 Run pipeline
+        run: python scripts/run_pipeline.py
+
+      - name: 📤 Upload raw data & logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-data-${{ github.run_id }}
+          path: |
+            data/raw/
+            logs/
+          retention-days: 30

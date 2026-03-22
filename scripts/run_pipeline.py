@@ -13,10 +13,16 @@ Usage:
 """
 
 import sys
+from pathlib import Path
+
+# Ensure project root is on sys.path (needed when run as `python scripts/run_pipeline.py`)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
 import logging
 import argparse
 from datetime import date
-from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Logging → console + logs/pipeline_YYYY-MM-DD.log
@@ -80,7 +86,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     # 2. Load — Import raw JSON → Supabase staging
     # ------------------------------------------------------------------
-    from scripts.import_raw_data import run_import
+    from import_raw_data import run_import
 
     results["Import to staging"] = run_step(
         "Import to staging",
@@ -93,7 +99,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     # 3. Transform — staging → star schema
     # ------------------------------------------------------------------
-    from scripts.transform import run_transform
+    from transform import run_transform
 
     results["Transform to star schema"] = run_step(
         "Transform to star schema",

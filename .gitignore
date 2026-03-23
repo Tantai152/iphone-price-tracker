@@ -135,6 +135,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
+ml_env/
 .env
 .envrc
 .venv
@@ -208,3 +209,16 @@ __marimo__/
 
 # Raw data (real scrapes) — keep mock
 data/raw/2*/
+
+
+# ==========================================
+# HOÀNG NGUYÊN - ML DATA & ARTIFACTS
+# ==========================================
+# Bỏ qua các file dữ liệu dạng bảng (rất nặng)
+*.csv
+*.xlsx
+*.parquet
+
+# Bỏ qua các file model đã train xong (tránh làm phình to GitHub)
+*.pkl
+*.joblib

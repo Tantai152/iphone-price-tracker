@@ -212,13 +212,13 @@ data/raw/2*/
 
 
 # ==========================================
-# HOÀNG NGUYÊN - ML DATA & ARTIFACTS
+# ML DATA & ARTIFACTS 
 # ==========================================
-# Bỏ qua các file dữ liệu dạng bảng (rất nặng)
+# Ignore tabular data files (very heavy)
 *.csv
 *.xlsx
 *.parquet
 
-# Bỏ qua các file model đã train xong (tránh làm phình to GitHub)
+# Ignore model files that have already been trained (to avoid bloating your GitHub repository).
 *.pkl
 *.joblib

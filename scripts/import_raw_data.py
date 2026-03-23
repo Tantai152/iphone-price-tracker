@@ -50,7 +50,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("❌ Missing SUPABASE_URL or SUPABASE_KEY in .env file")
+    raise ValueError("Missing SUPABASE_URL or SUPABASE_KEY in .env file")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -95,7 +95,7 @@ def discover_files(date_filter: str | None = None) -> list[Path]:
             logger.warning("Date folder not found: %s", d)
             continue
         day_files = sorted(d.glob("*.json"))
-        logger.info("📂 %s -> %d file(s)", d.name, len(day_files))
+        logger.info(" %s -> %d file(s)", d.name, len(day_files))
         files.extend(day_files)
 
     return files
@@ -111,22 +111,22 @@ def load_json_file(file_path: Path) -> list[dict] | None:
 
         if not isinstance(data, list):
             logger.warning(
-                "⚠️  %s: expected JSON array, got %s — skipping",
+                " %s: expected JSON array, got %s — skipping",
                 file_path.name, type(data).__name__,
             )
             return None
 
         if len(data) == 0:
-            logger.warning("⚠️  %s: empty array — skipping", file_path.name)
+            logger.warning(" %s: empty array — skipping", file_path.name)
             return None
 
-        logger.info("✅ Loaded %d records from %s", len(data), file_path.name)
+        logger.info("Loaded %d records from %s", len(data), file_path.name)
         return data
 
     except FileNotFoundError:
-        logger.error("❌ File not found: %s", file_path)
+        logger.error("File not found: %s", file_path)
     except json.JSONDecodeError as exc:
-        logger.error("❌ Invalid JSON in %s: %s", file_path.name, exc)
+        logger.error("Invalid JSON in %s: %s", file_path.name, exc)
 
     return None
 
@@ -148,7 +148,7 @@ def insert_data(data: list[dict], dry_run: bool = False) -> bool:
 
         if dry_run:
             logger.info(
-                "🔍 [DRY-RUN] Would upsert records %d-%d into '%s'",
+                "[DRY-RUN] Would upsert records %d-%d into '%s'",
                 start + 1, end, TABLE_NAME,
             )
             success += len(batch)
@@ -165,7 +165,7 @@ def insert_data(data: list[dict], dry_run: bool = False) -> bool:
     if all_ok:
         logger.info("🎉 %d / %d records upserted", success, total)
     else:
-        logger.warning("⚠️  Only %d / %d records succeeded", success, total)
+        logger.warning("Only %d / %d records succeeded", success, total)
 
     return all_ok
 
@@ -189,18 +189,18 @@ def archive_file(file_path: Path, dry_run: bool = False) -> None:
     dest = ARCHIVE_ROOT / relative
 
     if dry_run:
-        logger.info("🔍 [DRY-RUN] Would archive -> %s", dest)
+        logger.info("[DRY-RUN] Would archive -> %s", dest)
         return
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(file_path), str(dest))
-    logger.info("📦 Archived -> %s", dest)
+    logger.info("Archived -> %s", dest)
 
     # Remove empty date folder from raw/
     try:
         if not any(file_path.parent.iterdir()):
             file_path.parent.rmdir()
-            logger.info("🗑️  Removed empty folder: %s", file_path.parent)
+            logger.info("Removed empty folder: %s", file_path.parent)
     except Exception:
         pass
 
@@ -261,11 +261,11 @@ def run_import(
     )
     if archive:
         logger.info(
-            "📦 %d file(s) archived to %s/",
+            "%d file(s) archived to %s/",
             len(archived_files), ARCHIVE_ROOT,
         )
     if failed_files:
-        logger.warning("⚠️  %d file(s) failed (kept in data/raw/ for retry):", len(failed_files))
+        logger.warning("%d file(s) failed (kept in data/raw/ for retry):", len(failed_files))
         for f in failed_files:
             logger.warning("   • %s", f)
     logger.info("=" * 60)
